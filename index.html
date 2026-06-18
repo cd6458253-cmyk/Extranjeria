@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#1a1a2e"/>
+<title>CitaBot Control</title>
+<link rel="manifest" href="/manifest.json"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0d0d1a;--bg2:#1a1a2e;--bg3:#16213e;--card:#1e1e3a;
+  --accent:#6c63ff;--green:#00e676;--red:#ff5252;--yellow:#ffca28;--orange:#ff9800;
+  --text:#e0e0ff;--text2:#8888bb;--border:#2a2a4a;
+  --radius:14px;--gap:12px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden}
+
+/* ── Layout ── */
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+#header{background:var(--bg2);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0;z-index:10}
+#header h1{font-size:18px;font-weight:700;background:linear-gradient(135deg,#6c63ff,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#connStatus{font-size:11px;padding:3px 8px;border-radius:20px;font-weight:600}
+#connStatus.connected{background:#00e67622;color:var(--green);border:1px solid var(--green)}
+#connStatus.disconnected{background:#ff525222;color:var(--red);border:1px solid var(--red)}
+#connStatus.connecting{background:#ffca2822;color:var(--yellow);border:1px solid var(--yellow)}
+
+/* ── Tabs ── */
+#navTabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.navTab{flex:1;padding:10px 4px;text-align:center;font-size:11px;font-weight:600;color:var(--text2);border:none;background:none;cursor:pointer;transition:all .2s;border-bottom:2px solid transparent}
+.navTab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* ── Pages ── */
+#pages{flex:1;overflow:hidden;position:relative}
+.page{position:absolute;inset:0;overflow-y:auto;display:none;padding:var(--gap)}
+.page.active{display:block}
+
+/* ── Cards ── */
+.card{background:var(--card);border-radius:var(--radius);padding:14px;margin-bottom:var(--gap);border:1px solid var(--border)}
+.card-title{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+
+/* ── Status ── */
+#statusBadge{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700}
+#statusDot{width:10px;height:10px;border-radius:50%;background:var(--text2);flex-shrink:0;transition:background .3s}
+#statusDot.running{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.5s infinite}
+#statusDot.idle{background:var(--text2)}
+#statusDot.error{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── Person tabs ── */
+#personTabs{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto;padding-bottom:2px}
+.personTab{flex-shrink:0;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1.5px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:all .2s}
+.personTab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* ── Sub tabs ── */
+#subTabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px}
+.subTab{padding:4px 10px;border-radius:8px;font-size:11px;font-weight:600;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:all .2s}
+.subTab.active{background:var(--bg3);border-color:var(--accent);color:var(--accent)}
+
+/* ── Buttons ── */
+.btn{width:100%;padding:13px;border-radius:12px;font-size:14px;font-weight:700;border:none;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn:active{transform:scale(.97)}
+.btn-green{background:linear-gradient(135deg,#00c853,#00e676);color:#000}
+.btn-red{background:linear-gradient(135deg,#c62828,#ff5252);color:#fff}
+.btn-accent{background:linear-gradient(135deg,#5c55d0,#6c63ff);color:#fff}
+.btn-warn{background:linear-gradient(135deg,#e65100,#ff9800);color:#fff}
+.btn-sm{padding:8px 14px;font-size:12px;border-radius:8px;width:auto}
+.btn-row{display:flex;gap:8px;margin-bottom:8px}
+.btn-row .btn{flex:1}
+
+/* ── Alert box ── */
+#alertBox{display:none;border-radius:12px;padding:12px 14px;margin-bottom:var(--gap);font-size:13px;font-weight:600;border:1.5px solid}
+#alertBox.success{background:#00e67615;border-color:var(--green);color:var(--green)}
+#alertBox.warn{background:#ffca2815;border-color:var(--yellow);color:var(--yellow)}
+#alertBox.error{background:#ff525215;border-color:var(--red);color:var(--red)}
+
+/* ── Form fields ── */
+.field{margin-bottom:10px}
+.field label{display:block;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.field input,.field select,.field textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;outline:none;transition:border .2s}
+.field input:focus,.field select:focus{border-color:var(--accent)}
+.field select option{background:var(--bg3)}
+.field textarea{resize:none;height:60px;font-size:12px}
+
+/* ── PKT chips ── */
+#pktChips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+.pkt-chip{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;background:var(--bg3);border:1px solid var(--border);color:var(--text2)}
+
+/* ── Log ── */
+#logList{font-size:11px;font-family:'Courier New',monospace;display:flex;flex-direction:column;gap:3px}
+.log-entry{padding:3px 0;border-bottom:1px solid var(--border)22;display:flex;gap:6px}
+.log-time{color:var(--text2);flex-shrink:0;font-size:10px;padding-top:1px}
+
+/* ── Info row ── */
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)33;font-size:12px}
+.info-row:last-child{border:none}
+.info-label{color:var(--text2)}
+.info-val{font-weight:600;text-align:right}
+
+/* ── Config ── */
+#wsUrlRow{display:flex;gap:6px;align-items:flex-end}
+#wsUrlRow .field{flex:1;margin:0}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <div id="header">
+    <h1>🤖 CitaBot</h1>
+    <span id="connStatus" class="disconnected">Disconnected</span>
+  </div>
+
+  <!-- Nav tabs -->
+  <div id="navTabs">
+    <button class="navTab active" onclick="showPage('dashboard')">📊 Dashboard</button>
+    <button class="navTab" onclick="showPage('profiles')">👤 Profiles</button>
+    <button class="navTab" onclick="showPage('logs')">📋 Logs</button>
+    <button class="navTab" onclick="showPage('settings')">⚙️ Config</button>
+  </div>
+
+  <!-- Pages -->
+  <div id="pages">
+
+    <!-- ── DASHBOARD ── -->
+    <div class="page active" id="page-dashboard">
+      <div id="alertBox"></div>
+
+      <!-- Status card -->
+      <div class="card">
+        <div class="card-title">Bot Status</div>
+        <div id="statusBadge">
+          <div id="statusDot" class="idle"></div>
+          <span id="statusText">Idle / Stopped</span>
+        </div>
+        <div style="margin-top:8px" class="info-row">
+          <span class="info-label">Active Person</span>
+          <span class="info-val" id="activePersonLabel">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Sub Profile</span>
+          <span class="info-val" id="activeSubLabel">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Extension</span>
+          <span class="info-val" id="extConnLabel" style="color:var(--red)">Not connected</span>
+        </div>
+      </div>
+
+      <!-- Person selector -->
+      <div class="card">
+        <div class="card-title">Select Person</div>
+        <div id="personTabs">
+          <button class="personTab active" onclick="cmdSwitchPerson(0)">👤 Fahad</button>
+          <button class="personTab" onclick="cmdSwitchPerson(1)">👤 Tayyab</button>
+          <button class="personTab" onclick="cmdSwitchPerson(2)">👤 Adnan</button>
+          <button class="personTab" onclick="cmdSwitchPerson(3)">👤 Waqar</button>
+        </div>
+        <div id="subTabs">
+          <button class="subTab active" onclick="cmdSwitchSub(0)">P1</button>
+          <button class="subTab" onclick="cmdSwitchSub(1)">P2</button>
+          <button class="subTab" onclick="cmdSwitchSub(2)">P3</button>
+          <button class="subTab" onclick="cmdSwitchSub(3)">P4</button>
+          <button class="subTab" onclick="cmdSwitchSub(4)">P5</button>
+          <button class="subTab" onclick="cmdSwitchSub(5)">P6</button>
+          <button class="subTab" onclick="cmdSwitchSub(6)">P7</button>
+          <button class="subTab" onclick="cmdSwitchSub(7)">P8</button>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="card">
+        <div class="card-title">Controls</div>
+        <div class="btn-row">
+          <button class="btn btn-green" id="btnStart" onclick="cmdBot('start')">▶ INICIAR</button>
+          <button class="btn btn-red" id="btnStop" onclick="cmdBot('stop')">⏹ DETENER</button>
+        </div>
+        <button class="btn btn-warn" onclick="cmdClearCookies()" style="margin-top:4px">🍪 Clear Cookies</button>
+      </div>
+
+      <!-- PKT Seconds -->
+      <div class="card">
+        <div class="card-title">PKT Reload Seconds</div>
+        <div id="pktChips"></div>
+      </div>
+    </div>
+
+    <!-- ── PROFILES ── -->
+    <div class="page" id="page-profiles">
+      <div class="card">
+        <div class="card-title">Person</div>
+        <div id="profPersonTabs" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px">
+          <button class="personTab active" onclick="selectProfPerson(0)">Fahad</button>
+          <button class="personTab" onclick="selectProfPerson(1)">Tayyab</button>
+          <button class="personTab" onclick="selectProfPerson(2)">Adnan</button>
+          <button class="personTab" onclick="selectProfPerson(3)">Waqar</button>
+        </div>
+        <div id="profSubTabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px">
+          <button class="subTab active" onclick="selectProfSub(0)">P1</button>
+          <button class="subTab" onclick="selectProfSub(1)">P2</button>
+          <button class="subTab" onclick="selectProfSub(2)">P3</button>
+          <button class="subTab" onclick="selectProfSub(3)">P4</button>
+          <button class="subTab" onclick="selectProfSub(4)">P5</button>
+          <button class="subTab" onclick="selectProfSub(5)">P6</button>
+          <button class="subTab" onclick="selectProfSub(6)">P7</button>
+          <button class="subTab" onclick="selectProfSub(7)">P8</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Profile Data — <span id="profLabel">Fahad / P1</span></div>
+        <div class="field"><label>Profile Name</label><input id="f_name" placeholder="ej: Juan García" oninput="markDirty()"/></div>
+        <div class="field"><label>NIE / DNI / Pasaporte</label><input id="f_nie" placeholder="AT329292" oninput="markDirty()"/></div>
+        <div class="field"><label>Nombre</label><input id="f_nombre" oninput="markDirty()"/></div>
+        <div class="field"><label>Apellido 1</label><input id="f_ap1" oninput="markDirty()"/></div>
+        <div class="field"><label>Apellido 2</label><input id="f_ap2" oninput="markDirty()"/></div>
+        <div class="field"><label>Fecha Nac. (YYYY o DD/MM/YYYY)</label><input id="f_fecha" placeholder="01/01/2003" oninput="markDirty()"/></div>
+        <div class="field"><label>País Nacionalidad</label><input id="f_pais" placeholder="ANGOLA" oninput="markDirty()"/></div>
+        <div class="field"><label>Teléfono</label><input id="f_tel" type="tel" oninput="markDirty()"/></div>
+        <div class="field"><label>Email</label><input id="f_email" type="email" oninput="markDirty()"/></div>
+        <div class="field"><label>Oficina</label><input id="f_oficina" placeholder="Palma" oninput="markDirty()"/></div>
+        <div class="field">
+          <label>Trámite</label>
+          <input id="f_tramite" placeholder="SOLICITUD AUTORIZACIONES - MALLORCA" oninput="markDirty()"/>
+        </div>
+        <div class="field">
+          <label>Date Range (DD/MM/YYYY - DD/MM/YYYY)</label>
+          <input id="f_daterange" placeholder="01/06/2026 - 30/06/2026" oninput="markDirty()"/>
+        </div>
+        <button class="btn btn-accent" id="btnSaveProfile" onclick="saveProfile()">💾 Save Profile</button>
+      </div>
+    </div>
+
+    <!-- ── LOGS ── -->
+    <div class="page" id="page-logs">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span class="card-title" style="margin:0">Activity Log</span>
+          <button class="btn btn-sm btn-accent" onclick="clearLogs()">Clear</button>
+        </div>
+        <div id="logList"><div style="color:var(--text2);font-size:12px">Waiting for logs...</div></div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS ── -->
+    <div class="page" id="page-settings">
+      <div class="card">
+        <div class="card-title">Server Connection</div>
+        <div id="wsUrlRow">
+          <div class="field">
+            <label>WebSocket Server URL</label>
+            <input id="wsUrl" type="url" placeholder="wss://your-app.railway.app"/>
+          </div>
+        </div>
+        <button class="btn btn-accent" onclick="saveAndReconnect()" style="margin-top:8px">🔌 Connect</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">PKT Reload Seconds</div>
+        <div class="field">
+          <label>Seconds (comma separated, 0–59)</label>
+          <input id="pktInput" placeholder="1,3,5,6,12,15,18,22,28,41,47,51,57"/>
+        </div>
+        <button class="btn btn-accent" onclick="savePkt()" style="margin-top:4px">💾 Save PKT</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">About</div>
+        <div class="info-row"><span class="info-label">Version</span><span class="info-val">v66</span></div>
+        <div class="info-row"><span class="info-label">Build</span><span class="info-val">Firefox/Kiwi</span></div>
+        <div class="info-row"><span class="info-label">Server</span><span class="info-val" id="serverLabel">—</span></div>
+      </div>
+    </div>
+
+  </div><!-- /pages -->
+</div><!-- /app -->
+
+<script>
+// ════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════
+const PERSONS = ['Fahad','Tayyab','Adnan','Waqar'];
+let ws = null;
+let reconnectTimer = null;
+let wsUrl = localStorage.getItem('citabot_ws') || '';
+let activePerson = 0, activeSub = 0;
+let profPerson = 0, profSub = 0;
+let profiles = new Array(32).fill(null);
+let pktSeconds = [1,3,5,6,12,15,18,22,28,41,47,51,57];
+let profileDirty = false;
+
+// ════════════════════════════════════════
+// WEBSOCKET
+// ════════════════════════════════════════
+function connect() {
+  if (!wsUrl) { setStatus('disconnected','No server URL'); return; }
+  if (ws && ws.readyState < 2) ws.close();
+  setConnStatus('connecting');
+  try {
+    ws = new WebSocket(wsUrl);
+  } catch(e) { scheduleReconnect(); return; }
+
+  ws.onopen = () => {
+    setConnStatus('connected');
+    clearTimeout(reconnectTimer);
+    send({ type:'register', role:'app' });
+    document.getElementById('serverLabel').textContent = wsUrl.replace('wss://','').replace('ws://','').split('/')[0];
+  };
+
+  ws.onmessage = e => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+    handleMessage(msg);
+  };
+
+  ws.onclose = () => { setConnStatus('disconnected'); scheduleReconnect(); };
+  ws.onerror  = () => { setConnStatus('disconnected'); };
+}
+
+function scheduleReconnect() {
+  clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(connect, 4000);
+}
+
+function send(obj) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
+
+// ════════════════════════════════════════
+// MESSAGE HANDLER
+// ════════════════════════════════════════
+function handleMessage(msg) {
+  if (msg.type === 'fullState') {
+    const s = msg.state;
+    profiles = s.profiles || profiles;
+    pktSeconds = s.pktSeconds || pktSeconds;
+    updateBotStatus(s.botRunning, s.status);
+    updatePersonUI(s.activePerson ?? 0, s.activeSubTab ?? 0);
+    renderPktChips();
+    loadProfileForm();
+  }
+  else if (msg.type === 'statusUpdate') {
+    updateBotStatus(msg.botRunning, msg.status);
+    if (msg.activePerson != null) updatePersonUI(msg.activePerson, msg.activeSubTab ?? activeSub);
+    const extConnected = msg.extensionConnected !== false;
+    document.getElementById('extConnLabel').textContent = extConnected ? 'Connected ✅' : 'Not connected';
+    document.getElementById('extConnLabel').style.color = extConnected ? 'var(--green)' : 'var(--red)';
+  }
+  else if (msg.type === 'alert') {
+    showAlert(msg.text, msg.level === 'success' ? 'success' : msg.level === 'error' ? 'error' : 'warn');
+    if (msg.level === 'success') vibrate([200,100,200]);
+    else vibrate([100]);
+  }
+  else if (msg.type === 'log') {
+    addLogEntry(msg.entry);
+  }
+  else if (msg.type === 'profilesSync') {
+    profiles = msg.profiles;
+    loadProfileForm();
+  }
+  else if (msg.type === 'pktSync') {
+    pktSeconds = msg.pktSeconds;
+    renderPktChips();
+    document.getElementById('pktInput').value = pktSeconds.join(',');
+  }
+}
+
+// ════════════════════════════════════════
+// UI UPDATES
+// ════════════════════════════════════════
+function setConnStatus(s) {
+  const el = document.getElementById('connStatus');
+  el.className = 'connStatus ' + s;
+  el.textContent = s === 'connected' ? 'Connected' : s === 'connecting' ? 'Connecting…' : 'Disconnected';
+  el.classList.add(s);
+}
+
+function updateBotStatus(running, statusText) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  dot.className = 'idle';
+  if (running) {
+    dot.classList.add('running');
+    txt.textContent = statusText || 'Running…';
+  } else {
+    txt.textContent = statusText || 'Idle / Stopped';
+  }
+}
+
+function updatePersonUI(person, sub) {
+  activePerson = person;
+  activeSub = sub;
+  document.querySelectorAll('#personTabs .personTab').forEach((b,i) => b.classList.toggle('active', i===person));
+  document.querySelectorAll('#subTabs .subTab').forEach((b,i) => b.classList.toggle('active', i===sub));
+  document.getElementById('activePersonLabel').textContent = PERSONS[person] || '—';
+  document.getElementById('activeSubLabel').textContent = 'P' + (sub + 1);
+}
+
+function renderPktChips() {
+  const el = document.getElementById('pktChips');
+  el.innerHTML = pktSeconds.map(s => `<span class="pkt-chip">${s}s</span>`).join('');
+  document.getElementById('pktInput').value = pktSeconds.join(',');
+}
+
+function showAlert(text, type) {
+  const el = document.getElementById('alertBox');
+  el.textContent = text;
+  el.className = type || 'warn';
+  el.style.display = 'block';
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.style.display = 'none', 6000);
+}
+
+function addLogEntry(entry) {
+  const list = document.getElementById('logList');
+  if (list.children.length === 1 && list.children[0].className !== 'log-entry') list.innerHTML = '';
+  const d = new Date(entry.t);
+  const time = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0') + ':' + d.getSeconds().toString().padStart(2,'0');
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-time">${time}</span><span style="color:${entry.color||'#e0e0ff'}">${entry.text}</span>`;
+  list.insertBefore(div, list.firstChild);
+  while (list.children.length > 100) list.removeChild(list.lastChild);
+}
+
+function clearLogs() {
+  document.getElementById('logList').innerHTML = '<div style="color:var(--text2);font-size:12px">Log cleared</div>';
+}
+
+// ════════════════════════════════════════
+// COMMANDS
+// ════════════════════════════════════════
+function cmdBot(action) {
+  send({ type:'command', cmd: action });
+  showAlert(action === 'start' ? '▶ Bot start command sent' : '⏹ Bot stop command sent', 'warn');
+}
+
+function cmdSwitchPerson(p) {
+  activePerson = p;
+  send({ type:'command', cmd:'switchPerson', person: p });
+  updatePersonUI(p, activeSub);
+}
+
+function cmdSwitchSub(s) {
+  activeSub = s;
+  send({ type:'command', cmd:'switchSubTab', person: activePerson, sub: s });
+  updatePersonUI(activePerson, s);
+}
+
+function cmdClearCookies() {
+  if (!confirm('Clear cookies & restart?')) return;
+  send({ type:'command', cmd:'clearCookies' });
+  showAlert('🍪 Clear cookies command sent', 'warn');
+}
+
+// ════════════════════════════════════════
+// PROFILES
+// ════════════════════════════════════════
+function gi(p, s) { return p * 8 + s; }
+
+function selectProfPerson(p) {
+  if (profileDirty && !confirm('Unsaved changes! Discard?')) return;
+  profPerson = p;
+  profSub = 0;
+  profileDirty = false;
+  document.querySelectorAll('#profPersonTabs .personTab').forEach((b,i) => b.classList.toggle('active', i===p));
+  document.querySelectorAll('#profSubTabs .subTab').forEach((b,i) => b.classList.toggle('active', i===0));
+  loadProfileForm();
+}
+
+function selectProfSub(s) {
+  if (profileDirty && !confirm('Unsaved changes! Discard?')) return;
+  profSub = s;
+  profileDirty = false;
+  document.querySelectorAll('#profSubTabs .subTab').forEach((b,i) => b.classList.toggle('active', i===s));
+  loadProfileForm();
+}
+
+function loadProfileForm() {
+  const d = profiles[gi(profPerson, profSub)] || {};
+  document.getElementById('profLabel').textContent = PERSONS[profPerson] + ' / P' + (profSub+1);
+  const f = id => document.getElementById(id);
+  f('f_name').value    = d.name || '';
+  f('f_nie').value     = d.nie || '';
+  f('f_nombre').value  = d.nombre || '';
+  f('f_ap1').value     = d.ap1 || '';
+  f('f_ap2').value     = d.ap2 || '';
+  f('f_fecha').value   = d.fecha || '';
+  f('f_pais').value    = d.pais || '';
+  f('f_tel').value     = d.tel || '';
+  f('f_email').value   = d.email || '';
+  f('f_oficina').value = (d.oficinas && d.oficinas[0]) || d.oficina || '';
+  f('f_tramite').value = d.tramiteText || d.tramite || '';
+  f('f_daterange').value = (d.dateFrom && d.dateTo) ? d.dateFrom + ' - ' + d.dateTo : '';
+  profileDirty = false;
+  document.getElementById('btnSaveProfile').textContent = '💾 Save Profile';
+}
+
+function markDirty() {
+  profileDirty = true;
+  document.getElementById('btnSaveProfile').textContent = '💾 Save Profile *';
+}
+
+function saveProfile() {
+  const f = id => document.getElementById(id).value.trim();
+  const dateRange = f('f_daterange');
+  let dateFrom = '', dateTo = '';
+  if (dateRange.includes(' - ')) {
+    const parts = dateRange.split(' - ');
+    dateFrom = parts[0].trim();
+    dateTo = parts[1].trim();
+  }
+  const data = {
+    pi: profSub,
+    _personOwner: profPerson,
+    name:     f('f_name'),
+    nie:      f('f_nie').toUpperCase(),
+    nombre:   f('f_nombre').toUpperCase(),
+    ap1:      f('f_ap1').toUpperCase(),
+    ap2:      f('f_ap2').toUpperCase(),
+    fecha:    f('f_fecha'),
+    pais:     f('f_pais').toUpperCase(),
+    tel:      f('f_tel'),
+    email:    f('f_email'),
+    oficinas: [f('f_oficina')],
+    tramiteText: f('f_tramite').toUpperCase(),
+    dateFrom, dateTo
+  };
+  const idx = gi(profPerson, profSub);
+  profiles[idx] = data;
+  send({ type:'profileUpdate', gi: idx, data });
+  profileDirty = false;
+  document.getElementById('btnSaveProfile').textContent = '✅ Saved!';
+  setTimeout(() => document.getElementById('btnSaveProfile').textContent = '💾 Save Profile', 2000);
+  vibrate([50,30,50]);
+}
+
+// ════════════════════════════════════════
+// SETTINGS
+// ════════════════════════════════════════
+function saveAndReconnect() {
+  const url = document.getElementById('wsUrl').value.trim();
+  if (!url) return;
+  wsUrl = url;
+  localStorage.setItem('citabot_ws', url);
+  connect();
+}
+
+function savePkt() {
+  const raw = document.getElementById('pktInput').value;
+  const arr = raw.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x) && x >= 0 && x < 60);
+  if (!arr.length) return;
+  pktSeconds = arr;
+  send({ type:'command', cmd:'pktUpdate', pktSeconds: arr });
+  renderPktChips();
+  showAlert('✅ PKT seconds updated', 'success');
+}
+
+// ════════════════════════════════════════
+// NAV
+// ════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.navTab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const tabs = document.querySelectorAll('.navTab');
+  const map = {dashboard:0,profiles:1,logs:2,settings:3};
+  if (map[name] != null) tabs[map[name]].classList.add('active');
+}
+
+// ════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════
+function vibrate(pattern) {
+  try { navigator.vibrate && navigator.vibrate(pattern); } catch {}
+}
+
+function setStatus(s, txt) {
+  setConnStatus(s);
+}
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+document.getElementById('wsUrl').value = wsUrl;
+if (wsUrl) connect();
+else { showPage('settings'); }
+</script>
+</body>
+</html>
